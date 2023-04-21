@@ -11,11 +11,13 @@ import org.jboss.jandex.ParameterizedType;
 import org.jboss.jandex.Type;
 
 import io.quarkus.amazon.common.runtime.AmazonClientApacheTransportRecorder;
+import io.quarkus.amazon.common.runtime.AmazonClientAwsCrtTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientNettyTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientUrlConnectionTransportRecorder;
+import io.quarkus.amazon.common.runtime.AsyncHttpClientBuildTimeConfig;
+import io.quarkus.amazon.common.runtime.AsyncHttpClientConfig;
 import io.quarkus.amazon.common.runtime.AwsConfig;
-import io.quarkus.amazon.common.runtime.NettyHttpClientConfig;
 import io.quarkus.amazon.common.runtime.SdkBuildTimeConfig;
 import io.quarkus.amazon.common.runtime.SdkConfig;
 import io.quarkus.amazon.common.runtime.SyncHttpClientBuildTimeConfig;
@@ -75,7 +77,8 @@ abstract public class AbstractAmazonServiceProcessor {
             BuildProducer<AmazonClientInterceptorsPathBuildItem> interceptors,
             BuildProducer<AmazonClientBuildItem> clientProducer,
             SdkBuildTimeConfig buildTimeSdkConfig,
-            SyncHttpClientBuildTimeConfig buildTimeSyncConfig) {
+            SyncHttpClientBuildTimeConfig buildTimeSyncConfig,
+            AsyncHttpClientBuildTimeConfig buildTimeAsyncConfig) {
 
         feature.produce(new FeatureBuildItem(amazonServiceClientName()));
         extensionSslNativeSupport.produce(new ExtensionSslNativeSupportBuildItem(amazonServiceClientName()));
@@ -96,7 +99,7 @@ abstract public class AbstractAmazonServiceProcessor {
         }
         if (syncClassName.isPresent() || asyncClassName.isPresent()) {
             clientProducer.produce(new AmazonClientBuildItem(syncClassName, asyncClassName, configName(),
-                    buildTimeSdkConfig, buildTimeSyncConfig));
+                    buildTimeSdkConfig, buildTimeSyncConfig, buildTimeAsyncConfig));
         }
     }
 
@@ -154,7 +157,8 @@ abstract public class AbstractAmazonServiceProcessor {
 
     protected void createNettyAsyncTransportBuilder(List<AmazonClientBuildItem> amazonClients,
             AmazonClientNettyTransportRecorder recorder,
-            RuntimeValue<NettyHttpClientConfig> asyncConfig,
+            AsyncHttpClientBuildTimeConfig buildAsyncConfig,
+            RuntimeValue<AsyncHttpClientConfig> asyncConfig,
             BuildProducer<AmazonClientAsyncTransportBuildItem> clientAsyncTransports) {
 
         Optional<AmazonClientBuildItem> matchingClientBuildItem = amazonClients.stream()
@@ -163,6 +167,35 @@ abstract public class AbstractAmazonServiceProcessor {
 
         matchingClientBuildItem.ifPresent(client -> {
             if (!client.getAsyncClassName().isPresent()) {
+                return;
+            }
+            if (buildAsyncConfig.type != AsyncHttpClientBuildTimeConfig.AsyncClientType.NETTY) {
+                return;
+            }
+
+            clientAsyncTransports.produce(
+                    new AmazonClientAsyncTransportBuildItem(
+                            client.getAwsClientName(),
+                            client.getAsyncClassName().get(),
+                            recorder.configureAsync(configName(), asyncConfig)));
+        });
+    }
+
+    protected void createAwsCrtAsyncTransportBuilder(List<AmazonClientBuildItem> amazonClients,
+            AmazonClientAwsCrtTransportRecorder recorder,
+            AsyncHttpClientBuildTimeConfig buildAsyncConfig,
+            RuntimeValue<AsyncHttpClientConfig> asyncConfig,
+            BuildProducer<AmazonClientAsyncTransportBuildItem> clientAsyncTransports) {
+
+        Optional<AmazonClientBuildItem> matchingClientBuildItem = amazonClients.stream()
+                .filter(c -> c.getAwsClientName().equals(configName()))
+                .findAny();
+
+        matchingClientBuildItem.ifPresent(client -> {
+            if (!client.getAsyncClassName().isPresent()) {
+                return;
+            }
+            if (buildAsyncConfig.type != AsyncHttpClientBuildTimeConfig.AsyncClientType.AWS_CRT) {
                 return;
             }
 

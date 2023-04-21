@@ -14,12 +14,12 @@ import io.quarkus.amazon.common.deployment.AmazonClientSyncTransportBuildItem;
 import io.quarkus.amazon.common.deployment.AmazonHttpClients;
 import io.quarkus.amazon.common.deployment.RequireAmazonClientBuildItem;
 import io.quarkus.amazon.common.runtime.AmazonClientApacheTransportRecorder;
+import io.quarkus.amazon.common.runtime.AmazonClientAwsCrtTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientNettyTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientUrlConnectionTransportRecorder;
 import io.quarkus.amazon.sts.runtime.StsBuildTimeConfig;
 import io.quarkus.amazon.sts.runtime.StsClientProducer;
-import io.quarkus.amazon.sts.runtime.StsConfig;
 import io.quarkus.amazon.sts.runtime.StsRecorder;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.BeanRegistrationPhaseBuildItem;
@@ -90,19 +90,19 @@ public class StsProcessor extends AbstractAmazonServiceProcessor {
                 interceptors,
                 clientProducer,
                 buildTimeConfig.sdk,
-                buildTimeConfig.syncClient);
+                buildTimeConfig.syncClient, buildTimeConfig.asyncClient);
     }
 
     @BuildStep(onlyIf = AmazonHttpClients.IsAmazonApacheHttpServicePresent.class)
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupApacheSyncTransport(List<AmazonClientBuildItem> amazonClients, StsRecorder recorder,
-            AmazonClientApacheTransportRecorder transportRecorder, StsConfig runtimeConfig,
+            AmazonClientApacheTransportRecorder transportRecorder,
             BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
 
         createApacheSyncTransportBuilder(amazonClients,
                 transportRecorder,
                 buildTimeConfig.syncClient,
-                recorder.getSyncConfig(runtimeConfig),
+                recorder.getSyncConfig(),
                 syncTransports);
     }
 
@@ -110,47 +110,60 @@ public class StsProcessor extends AbstractAmazonServiceProcessor {
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupUrlConnectionSyncTransport(List<AmazonClientBuildItem> amazonClients,
             StsRecorder recorder, AmazonClientUrlConnectionTransportRecorder transportRecorder,
-            StsConfig runtimeConfig,
             BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
 
         createUrlConnectionSyncTransportBuilder(amazonClients,
                 transportRecorder,
                 buildTimeConfig.syncClient,
-                recorder.getSyncConfig(runtimeConfig),
+                recorder.getSyncConfig(),
                 syncTransports);
     }
 
     @BuildStep(onlyIf = AmazonHttpClients.IsAmazonNettyHttpServicePresent.class)
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupNettyAsyncTransport(List<AmazonClientBuildItem> amazonClients, StsRecorder recorder,
-            AmazonClientNettyTransportRecorder transportRecorder, StsConfig runtimeConfig,
+            AmazonClientNettyTransportRecorder transportRecorder,
             BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
 
         createNettyAsyncTransportBuilder(amazonClients,
                 transportRecorder,
-                recorder.getAsyncConfig(runtimeConfig),
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
+                asyncTransports);
+    }
+
+    @BuildStep(onlyIf = AmazonHttpClients.IsAmazonAwsCrtHttpServicePresent.class)
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void setupAwsCrtAsyncTransport(List<AmazonClientBuildItem> amazonClients, StsRecorder recorder,
+            AmazonClientAwsCrtTransportRecorder transportRecorder,
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+
+        createAwsCrtAsyncTransportBuilder(amazonClients,
+                transportRecorder,
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
                 asyncTransports);
     }
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
     void createClientBuilders(StsRecorder recorder, AmazonClientRecorder commonRecorder,
-            StsConfig runtimeConfig, List<AmazonClientSyncTransportBuildItem> syncTransports,
+            List<AmazonClientSyncTransportBuildItem> syncTransports,
             List<AmazonClientAsyncTransportBuildItem> asyncTransports,
             BuildProducer<SyntheticBeanBuildItem> syntheticBeans,
             BuildProducer<AmazonClientSyncResultBuildItem> clientSync,
             BuildProducer<AmazonClientAsyncResultBuildItem> clientAsync) {
 
         createClientBuilders(commonRecorder,
-                recorder.getAwsConfig(runtimeConfig),
-                recorder.getSdkConfig(runtimeConfig),
+                recorder.getAwsConfig(),
+                recorder.getSdkConfig(),
                 buildTimeConfig.sdk,
                 syncTransports,
                 asyncTransports,
                 StsClientBuilder.class,
-                (syncTransport) -> recorder.createSyncBuilder(runtimeConfig, syncTransport),
+                (syncTransport) -> recorder.createSyncBuilder(syncTransport),
                 StsAsyncClientBuilder.class,
-                (asyncTransport) -> recorder.createAsyncBuilder(runtimeConfig, asyncTransport),
+                (asyncTransport) -> recorder.createAsyncBuilder(asyncTransport),
                 null,
                 null,
                 syntheticBeans,

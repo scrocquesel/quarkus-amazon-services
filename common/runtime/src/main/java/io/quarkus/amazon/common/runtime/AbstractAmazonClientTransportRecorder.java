@@ -19,7 +19,7 @@ public abstract class AbstractAmazonClientTransportRecorder {
 
     @SuppressWarnings("rawtypes")
     public RuntimeValue<SdkAsyncHttpClient.Builder> configureAsync(String clientName,
-            RuntimeValue<NettyHttpClientConfig> asyncConfigRuntime) {
+            RuntimeValue<AsyncHttpClientConfig> asyncConfigRuntime) {
         throw new IllegalStateException("Configuring an async client is not supported by " + this.getClass().getName());
     }
 

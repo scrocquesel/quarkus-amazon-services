@@ -1,7 +1,7 @@
 package io.quarkus.amazon.ssm.runtime;
 
+import io.quarkus.amazon.common.runtime.AsyncHttpClientConfig;
 import io.quarkus.amazon.common.runtime.AwsConfig;
-import io.quarkus.amazon.common.runtime.NettyHttpClientConfig;
 import io.quarkus.amazon.common.runtime.SdkConfig;
 import io.quarkus.amazon.common.runtime.SyncHttpClientConfig;
 import io.quarkus.runtime.RuntimeValue;
@@ -17,24 +17,29 @@ import software.amazon.awssdk.services.ssm.SsmClientBuilder;
 
 @Recorder
 public class SsmRecorder {
+    final SsmConfig config;
 
-    public RuntimeValue<SyncHttpClientConfig> getSyncConfig(SsmConfig config) {
+    public SsmRecorder(SsmConfig config) {
+        this.config = config;
+    }
+
+    public RuntimeValue<SyncHttpClientConfig> getSyncConfig() {
         return new RuntimeValue<>(config.syncClient);
     }
 
-    public RuntimeValue<NettyHttpClientConfig> getAsyncConfig(SsmConfig config) {
+    public RuntimeValue<AsyncHttpClientConfig> getAsyncConfig() {
         return new RuntimeValue<>(config.asyncClient);
     }
 
-    public RuntimeValue<AwsConfig> getAwsConfig(SsmConfig config) {
+    public RuntimeValue<AwsConfig> getAwsConfig() {
         return new RuntimeValue<>(config.aws);
     }
 
-    public RuntimeValue<SdkConfig> getSdkConfig(SsmConfig config) {
+    public RuntimeValue<SdkConfig> getSdkConfig() {
         return new RuntimeValue<>(config.sdk);
     }
 
-    public RuntimeValue<AwsClientBuilder> createSyncBuilder(SsmConfig config, RuntimeValue<SdkHttpClient.Builder> transport) {
+    public RuntimeValue<AwsClientBuilder> createSyncBuilder(RuntimeValue<SdkHttpClient.Builder> transport) {
         SsmClientBuilder builder = SsmClient.builder();
         if (transport != null) {
             builder.httpClientBuilder(transport.getValue());
@@ -42,7 +47,7 @@ public class SsmRecorder {
         return new RuntimeValue<>(builder);
     }
 
-    public RuntimeValue<AwsClientBuilder> createAsyncBuilder(SsmConfig config,
+    public RuntimeValue<AwsClientBuilder> createAsyncBuilder(
             RuntimeValue<SdkAsyncHttpClient.Builder> transport) {
 
         SsmAsyncClientBuilder builder = SsmAsyncClient.builder();

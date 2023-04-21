@@ -14,12 +14,12 @@ import io.quarkus.amazon.common.deployment.AmazonClientSyncTransportBuildItem;
 import io.quarkus.amazon.common.deployment.AmazonHttpClients;
 import io.quarkus.amazon.common.deployment.RequireAmazonClientBuildItem;
 import io.quarkus.amazon.common.runtime.AmazonClientApacheTransportRecorder;
+import io.quarkus.amazon.common.runtime.AmazonClientAwsCrtTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientNettyTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientUrlConnectionTransportRecorder;
 import io.quarkus.amazon.secretsmanager.runtime.SecretsManagerBuildTimeConfig;
 import io.quarkus.amazon.secretsmanager.runtime.SecretsManagerClientProducer;
-import io.quarkus.amazon.secretsmanager.runtime.SecretsManagerConfig;
 import io.quarkus.amazon.secretsmanager.runtime.SecretsManagerRecorder;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.BeanRegistrationPhaseBuildItem;
@@ -86,19 +86,19 @@ public class SecretsManagerProcessor extends AbstractAmazonServiceProcessor {
             BuildProducer<AmazonClientBuildItem> clientProducer) {
 
         setupExtension(clientRequirements, extensionSslNativeSupport, feature, interceptors, clientProducer,
-                buildTimeConfig.sdk, buildTimeConfig.syncClient);
+                buildTimeConfig.sdk, buildTimeConfig.syncClient, buildTimeConfig.asyncClient);
     }
 
     @BuildStep(onlyIf = AmazonHttpClients.IsAmazonApacheHttpServicePresent.class)
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupApacheSyncTransport(List<AmazonClientBuildItem> amazonClients, SecretsManagerRecorder recorder,
             AmazonClientApacheTransportRecorder transportRecorder,
-            SecretsManagerConfig runtimeConfig, BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
+            BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
 
         createApacheSyncTransportBuilder(amazonClients,
                 transportRecorder,
                 buildTimeConfig.syncClient,
-                recorder.getSyncConfig(runtimeConfig),
+                recorder.getSyncConfig(),
                 syncTransports);
     }
 
@@ -106,12 +106,12 @@ public class SecretsManagerProcessor extends AbstractAmazonServiceProcessor {
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupUrlConnectionSyncTransport(List<AmazonClientBuildItem> amazonClients, SecretsManagerRecorder recorder,
             AmazonClientUrlConnectionTransportRecorder transportRecorder,
-            SecretsManagerConfig runtimeConfig, BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
+            BuildProducer<AmazonClientSyncTransportBuildItem> syncTransports) {
 
         createUrlConnectionSyncTransportBuilder(amazonClients,
                 transportRecorder,
                 buildTimeConfig.syncClient,
-                recorder.getSyncConfig(runtimeConfig),
+                recorder.getSyncConfig(),
                 syncTransports);
     }
 
@@ -119,11 +119,25 @@ public class SecretsManagerProcessor extends AbstractAmazonServiceProcessor {
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupNettyAsyncTransport(List<AmazonClientBuildItem> amazonClients, SecretsManagerRecorder recorder,
             AmazonClientNettyTransportRecorder transportRecorder,
-            SecretsManagerConfig runtimeConfig, BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
 
         createNettyAsyncTransportBuilder(amazonClients,
                 transportRecorder,
-                recorder.getAsyncConfig(runtimeConfig),
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
+                asyncTransports);
+    }
+
+    @BuildStep(onlyIf = AmazonHttpClients.IsAmazonAwsCrtHttpServicePresent.class)
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void setupAwsCrtAsyncTransport(List<AmazonClientBuildItem> amazonClients, SecretsManagerRecorder recorder,
+            AmazonClientAwsCrtTransportRecorder transportRecorder,
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+
+        createAwsCrtAsyncTransportBuilder(amazonClients,
+                transportRecorder,
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
                 asyncTransports);
     }
 
@@ -131,7 +145,6 @@ public class SecretsManagerProcessor extends AbstractAmazonServiceProcessor {
     @Record(ExecutionTime.RUNTIME_INIT)
     void createClientBuilders(SecretsManagerRecorder recorder,
             AmazonClientRecorder commonRecorder,
-            SecretsManagerConfig runtimeConfig,
             List<AmazonClientSyncTransportBuildItem> syncTransports,
             List<AmazonClientAsyncTransportBuildItem> asyncTransports,
             BuildProducer<SyntheticBeanBuildItem> syntheticBeans,
@@ -139,15 +152,15 @@ public class SecretsManagerProcessor extends AbstractAmazonServiceProcessor {
             BuildProducer<AmazonClientAsyncResultBuildItem> clientAsync) {
 
         createClientBuilders(commonRecorder,
-                recorder.getAwsConfig(runtimeConfig),
-                recorder.getSdkConfig(runtimeConfig),
+                recorder.getAwsConfig(),
+                recorder.getSdkConfig(),
                 buildTimeConfig.sdk,
                 syncTransports,
                 asyncTransports,
                 SecretsManagerClientBuilder.class,
-                (syncTransport) -> recorder.createSyncBuilder(runtimeConfig, syncTransport),
+                (syncTransport) -> recorder.createSyncBuilder(syncTransport),
                 SecretsManagerAsyncClientBuilder.class,
-                (asyncTransport) -> recorder.createAsyncBuilder(runtimeConfig, asyncTransport),
+                (asyncTransport) -> recorder.createAsyncBuilder(asyncTransport),
                 null,
                 null,
                 syntheticBeans,

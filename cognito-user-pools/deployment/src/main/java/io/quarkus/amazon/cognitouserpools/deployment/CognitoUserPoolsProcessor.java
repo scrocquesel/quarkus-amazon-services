@@ -17,6 +17,7 @@ import io.quarkus.amazon.common.deployment.AmazonClientSyncTransportBuildItem;
 import io.quarkus.amazon.common.deployment.AmazonHttpClients;
 import io.quarkus.amazon.common.deployment.RequireAmazonClientBuildItem;
 import io.quarkus.amazon.common.runtime.AmazonClientApacheTransportRecorder;
+import io.quarkus.amazon.common.runtime.AmazonClientAwsCrtTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientNettyTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientUrlConnectionTransportRecorder;
@@ -85,7 +86,7 @@ public class CognitoUserPoolsProcessor extends AbstractAmazonServiceProcessor {
             BuildProducer<AmazonClientBuildItem> clientProducer) {
 
         setupExtension(clientRequirements, extensionSslNativeSupport, feature, interceptors, clientProducer,
-                buildTimeConfig.sdk, buildTimeConfig.syncClient);
+                buildTimeConfig.sdk, buildTimeConfig.syncClient, buildTimeConfig.asyncClient);
     }
 
     @BuildStep(onlyIf = AmazonHttpClients.IsAmazonApacheHttpServicePresent.class)
@@ -125,6 +126,20 @@ public class CognitoUserPoolsProcessor extends AbstractAmazonServiceProcessor {
 
         createNettyAsyncTransportBuilder(amazonClients,
                 transportRecorder,
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
+                asyncTransports);
+    }
+
+    @BuildStep(onlyIf = AmazonHttpClients.IsAmazonAwsCrtHttpServicePresent.class)
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void setupAwsCrtAsyncTransport(List<AmazonClientBuildItem> amazonClients, CognitoUserPoolsRecorder recorder,
+            AmazonClientAwsCrtTransportRecorder transportRecorder,
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+
+        createAwsCrtAsyncTransportBuilder(amazonClients,
+                transportRecorder,
+                buildTimeConfig.asyncClient,
                 recorder.getAsyncConfig(),
                 asyncTransports);
     }

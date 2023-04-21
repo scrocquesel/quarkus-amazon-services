@@ -14,12 +14,12 @@ import io.quarkus.amazon.common.deployment.AmazonClientSyncTransportBuildItem;
 import io.quarkus.amazon.common.deployment.AmazonHttpClients;
 import io.quarkus.amazon.common.deployment.RequireAmazonClientBuildItem;
 import io.quarkus.amazon.common.runtime.AmazonClientApacheTransportRecorder;
+import io.quarkus.amazon.common.runtime.AmazonClientAwsCrtTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientNettyTransportRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientRecorder;
 import io.quarkus.amazon.common.runtime.AmazonClientUrlConnectionTransportRecorder;
 import io.quarkus.amazon.s3.runtime.S3BuildTimeConfig;
 import io.quarkus.amazon.s3.runtime.S3ClientProducer;
-import io.quarkus.amazon.s3.runtime.S3Config;
 import io.quarkus.amazon.s3.runtime.S3Recorder;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.BeanRegistrationPhaseBuildItem;
@@ -87,7 +87,7 @@ public class S3Processor extends AbstractAmazonServiceProcessor {
             BuildProducer<AmazonClientBuildItem> clientProducer) {
 
         setupExtension(clientRequirements, extensionSslNativeSupport, feature, interceptors, clientProducer,
-                buildTimeConfig.sdk, buildTimeConfig.syncClient);
+                buildTimeConfig.sdk, buildTimeConfig.syncClient, buildTimeConfig.asyncClient);
     }
 
     @BuildStep(onlyIf = AmazonHttpClients.IsAmazonApacheHttpServicePresent.class)
@@ -120,10 +120,24 @@ public class S3Processor extends AbstractAmazonServiceProcessor {
     @Record(ExecutionTime.RUNTIME_INIT)
     void setupNettyAsyncTransport(List<AmazonClientBuildItem> amazonClients, S3Recorder recorder,
             AmazonClientNettyTransportRecorder transportRecorder,
-            S3Config runtimeConfig, BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
 
         createNettyAsyncTransportBuilder(amazonClients,
                 transportRecorder,
+                buildTimeConfig.asyncClient,
+                recorder.getAsyncConfig(),
+                asyncTransports);
+    }
+
+    @BuildStep(onlyIf = AmazonHttpClients.IsAmazonAwsCrtHttpServicePresent.class)
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void setupAwsCrtAsyncTransport(List<AmazonClientBuildItem> amazonClients, S3Recorder recorder,
+            AmazonClientAwsCrtTransportRecorder transportRecorder,
+            BuildProducer<AmazonClientAsyncTransportBuildItem> asyncTransports) {
+
+        createAwsCrtAsyncTransportBuilder(amazonClients,
+                transportRecorder,
+                buildTimeConfig.asyncClient,
                 recorder.getAsyncConfig(),
                 asyncTransports);
     }

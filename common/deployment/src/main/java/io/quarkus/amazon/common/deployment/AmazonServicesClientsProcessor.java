@@ -9,6 +9,7 @@ import jakarta.enterprise.inject.spi.DeploymentException;
 
 import org.jboss.jandex.DotName;
 
+import io.quarkus.amazon.common.runtime.AsyncHttpClientBuildTimeConfig.AsyncClientType;
 import io.quarkus.amazon.common.runtime.SdkBuildTimeConfig;
 import io.quarkus.amazon.common.runtime.SyncHttpClientBuildTimeConfig.SyncClientType;
 import io.quarkus.deployment.annotations.BuildProducer;
@@ -100,26 +101,41 @@ public class AmazonServicesClientsProcessor {
         boolean asyncTransportNeeded = amazonClients.stream().anyMatch(item -> item.getAsyncClassName().isPresent());
         final Predicate<AmazonClientBuildItem> isSyncApache = client -> client
                 .getBuildTimeSyncConfig().type == SyncClientType.APACHE;
+        final Predicate<AmazonClientBuildItem> isSyncUrlConnection = client -> client
+                .getBuildTimeSyncConfig().type == SyncClientType.URL;
+        final Predicate<AmazonClientBuildItem> isAsyncNetty = client -> client
+                .getBuildTimeAsyncConfig().type == AsyncClientType.NETTY;
+        final Predicate<AmazonClientBuildItem> isAsyncAwsCrt = client -> client
+                .getBuildTimeAsyncConfig().type == AsyncClientType.AWS_CRT;
 
         // Register what's needed depending on the clients in the classpath and the configuration.
         // We use the configuration to guide us but if we don't have any clients configured,
         // we still register what's needed depending on what is in the classpath.
         boolean isSyncApacheInClasspath = isInClasspath(AmazonHttpClients.APACHE_HTTP_SERVICE);
         boolean isSyncUrlConnectionInClasspath = isInClasspath(AmazonHttpClients.URL_CONNECTION_HTTP_SERVICE);
-        boolean isAsyncInClasspath = isInClasspath(AmazonHttpClients.NETTY_HTTP_SERVICE);
+        boolean isAsyncNettyInClasspath = isInClasspath(AmazonHttpClients.NETTY_HTTP_SERVICE);
+        boolean isAsyncAwsCrtInClasspath = isInClasspath(AmazonHttpClients.AWS_CRT_HTTP_SERVICE);
 
         // Check that the clients required by the configuration are available
+        boolean defaultClasspathSdkSyncHttpServiceRegistered = false;
         if (syncTransportNeeded) {
             if (amazonClients.stream().filter(isSyncApache).findAny().isPresent()) {
                 if (isSyncApacheInClasspath) {
                     registerSyncApacheClient(proxyDefinition, serviceProvider);
+                    defaultClasspathSdkSyncHttpServiceRegistered = true;
                 } else {
                     throw missingDependencyException("apache-client");
                 }
-            } else if (isSyncUrlConnectionInClasspath) {
-                registerSyncUrlConnectionClient(serviceProvider);
-            } else {
-                throw missingDependencyException("url-connection-client");
+            }
+            if (amazonClients.stream().filter(isSyncUrlConnection).findAny().isPresent()) {
+                if (isSyncUrlConnectionInClasspath) {
+                    // prefer apache
+                    if (!defaultClasspathSdkSyncHttpServiceRegistered) {
+                        registerSyncUrlConnectionClient(serviceProvider);
+                    }
+                } else {
+                    throw missingDependencyException("url-connection-client");
+                }
             }
         } else {
             // even if we don't register any clients via configuration, we still register the clients
@@ -131,10 +147,33 @@ public class AmazonServicesClientsProcessor {
             }
         }
 
-        if (isAsyncInClasspath) {
-            registerAsyncNettyClient(serviceProvider);
-        } else if (asyncTransportNeeded) {
-            throw missingDependencyException("netty-nio-client");
+        boolean defaultClasspathSdkAsyncHttpServiceRegistered = false;
+        if (asyncTransportNeeded) {
+            if (amazonClients.stream().filter(isAsyncNetty).findAny().isPresent()) {
+                if (isAsyncNettyInClasspath) {
+                    registerAsyncNettyClient(serviceProvider);
+                    defaultClasspathSdkAsyncHttpServiceRegistered = true;
+                } else {
+                    throw missingDependencyException("netty-nio-client");
+                }
+            }
+            if (amazonClients.stream().filter(isAsyncAwsCrt).findAny().isPresent()) {
+                if (isAsyncAwsCrtInClasspath) {
+                    if (!defaultClasspathSdkAsyncHttpServiceRegistered) {
+                        registerAsyncAwsCrtClient(serviceProvider);
+                    }
+                } else {
+                    throw missingDependencyException("aws-crt-client");
+                }
+            }
+        } else {
+            // even if we don't register any clients via configuration, we still register the clients
+            // but this time only based on the classpath.
+            if (isAsyncNettyInClasspath) {
+                registerAsyncNettyClient(serviceProvider);
+            } else if (isAsyncAwsCrtInClasspath) {
+                registerAsyncAwsCrtClient(serviceProvider);
+            }
         }
     }
 
@@ -158,6 +197,12 @@ public class AmazonServicesClientsProcessor {
         serviceProvider.produce(
                 new ServiceProviderBuildItem(SdkAsyncHttpService.class.getName(),
                         AmazonHttpClients.NETTY_HTTP_SERVICE));
+    }
+
+    private static void registerAsyncAwsCrtClient(BuildProducer<ServiceProviderBuildItem> serviceProvider) {
+        serviceProvider.produce(
+                new ServiceProviderBuildItem(SdkAsyncHttpService.class.getName(),
+                        AmazonHttpClients.AWS_CRT_HTTP_SERVICE));
     }
 
     private static boolean isInClasspath(String className) {

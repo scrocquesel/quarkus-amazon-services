@@ -1,7 +1,7 @@
 package io.quarkus.amazon.sqs.runtime;
 
+import io.quarkus.amazon.common.runtime.AsyncHttpClientConfig;
 import io.quarkus.amazon.common.runtime.AwsConfig;
-import io.quarkus.amazon.common.runtime.NettyHttpClientConfig;
 import io.quarkus.amazon.common.runtime.SdkConfig;
 import io.quarkus.amazon.common.runtime.SyncHttpClientConfig;
 import io.quarkus.runtime.annotations.ConfigDocSection;
@@ -37,5 +37,5 @@ public class SqsConfig {
      */
     @ConfigItem
     @ConfigDocSection
-    public NettyHttpClientConfig asyncClient;
+    public AsyncHttpClientConfig asyncClient;
 }

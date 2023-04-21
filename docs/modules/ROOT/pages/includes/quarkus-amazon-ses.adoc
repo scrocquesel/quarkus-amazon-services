@@ -44,6 +44,23 @@ endif::add-copy-button-to-env-var[]
 |`url`
 
 
+a|icon:lock[title=Fixed at build time] [[quarkus-amazon-ses_quarkus.ses.async-client.type]]`link:#quarkus-amazon-ses_quarkus.ses.async-client.type[quarkus.ses.async-client.type]`
+
+[.description]
+--
+Type of the async HTTP client implementation
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_SES_ASYNC_CLIENT_TYPE+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_SES_ASYNC_CLIENT_TYPE+++`
+endif::add-copy-button-to-env-var[]
+-- a|
+`netty`, `aws-crt` 
+|`netty`
+
+
 a|icon:lock[title=Fixed at build time] [[quarkus-amazon-ses_quarkus.ses.devservices.enabled]]`link:#quarkus-amazon-ses_quarkus.ses.devservices.enabled[quarkus.ses.devservices.enabled]`
 
 [.description]
