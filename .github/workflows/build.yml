@@ -25,12 +25,12 @@ on:
 jobs:
   build:
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os-name }}
     
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os-name: [ubuntu-latest, windows-latest]
 
 
     steps:
