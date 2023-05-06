@@ -4,5 +4,13 @@
     "config:base",
     "group:aws-java-sdk-v2Monorepo",
     ":dependencyDashboard"
+  ],
+  "packageRules": [
+    {
+      "matchDepTypes": [
+        "action"
+      ],
+      "groupName": "Github Actions"
+    }
   ]
 }
