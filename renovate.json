@@ -11,6 +11,12 @@
         "action"
       ],
       "groupName": "Github Actions"
+    },
+    {
+      "matchManagers": [
+        "maven-wrapper"
+      ],
+      "groupName": "Maven Wrapper"
     }
   ]
 }
