@@ -19,6 +19,8 @@
         <module>devservices</module>
         <module>dynamodb</module>
         <module>dynamodb-enhanced</module>
+        <module>dynamodb-panache-common</module>
+        <module>dynamodb-panache</module>
         <module>iam</module>
         <module>s3</module>
         <module>sns</module>
