@@ -373,7 +373,9 @@ public class AmazonClientExtensionsProcessor {
                         .produce(
                                 namedClient(SyntheticBeanBuildItem.configure(syncClientName), clientName)
                                         .unremovable()
-                                        .defaultBean()
+                                        .reserve(true)
+                                        .priority(0)
+                                        .priority(0)
                                         .setRuntimeInit()
                                         .scope(ApplicationScoped.class)
                                         .createWith(recorder.build(syncClientBuilderClass, clientName))
@@ -406,7 +408,8 @@ public class AmazonClientExtensionsProcessor {
                 syntheticBeans.produce(
                         namedClient(SyntheticBeanBuildItem.configure(asyncClientName), clientName)
                                 .unremovable()
-                                .defaultBean()
+                                .reserve(true)
+                                .priority(0)
                                 .setRuntimeInit()
                                 .scope(ApplicationScoped.class)
                                 .createWith(recorder.build(asyncClientBuilderClass, clientName))
@@ -433,7 +436,8 @@ public class AmazonClientExtensionsProcessor {
                 syntheticBeans.produce(
                         namedBuilder(SyntheticBeanBuildItem.configure(presignerBuilderClass), clientName)
                                 .unremovable()
-                                .defaultBean()
+                                .reserve(true)
+                                .priority(0)
                                 .setRuntimeInit()
                                 .scope(ApplicationScoped.class)
                                 .runtimeValue(presignerBuilder)
@@ -441,7 +445,8 @@ public class AmazonClientExtensionsProcessor {
                 syntheticBeans.produce(
                         namedClient(SyntheticBeanBuildItem.configure(presignerClientName), clientName)
                                 .unremovable()
-                                .defaultBean()
+                                .reserve(true)
+                                .priority(0)
                                 .setRuntimeInit()
                                 .scope(ApplicationScoped.class)
                                 .createWith(recorder.buildPresigner(presignerBuilderClass, clientName))
@@ -472,7 +477,8 @@ public class AmazonClientExtensionsProcessor {
                     syntheticBeans.produce(namedBuilder(SyntheticBeanBuildItem.configure(clientBuilder.getBuilderClass()),
                             clientBuilder.getClientName())
                             .unremovable()
-                            .defaultBean()
+                            .reserve(true)
+                            .priority(0)
                             .setRuntimeInit()
                             .scope(ApplicationScoped.class)
                             .createWith(otelRecorder.configure(clientBuilder.getClientBuilder()))
@@ -481,7 +487,8 @@ public class AmazonClientExtensionsProcessor {
                     syntheticBeans.produce(namedBuilder(SyntheticBeanBuildItem.configure(clientBuilder.getBuilderClass()),
                             clientBuilder.getClientName())
                             .unremovable()
-                            .defaultBean()
+                            .reserve(true)
+                            .priority(0)
                             .setRuntimeInit()
                             .scope(ApplicationScoped.class)
                             .runtimeValue(clientBuilder.getClientBuilder())

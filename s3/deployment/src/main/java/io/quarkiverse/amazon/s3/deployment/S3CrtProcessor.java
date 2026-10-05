@@ -132,7 +132,8 @@ public class S3CrtProcessor {
             syntheticBeans.produce(SyntheticBeanBuildItem.configure(S3CrtAsyncClientBuilder.class)
                     .unremovable()
                     .setRuntimeInit()
-                    .defaultBean()
+                    .reserve(true)
+                    .priority(0)
                     .scope(ApplicationScoped.class)
                     .runtimeValue(asyncClientBuilder)
                     .done());
