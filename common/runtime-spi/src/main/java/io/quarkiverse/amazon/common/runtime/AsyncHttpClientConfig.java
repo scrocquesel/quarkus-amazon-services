@@ -255,6 +255,23 @@ public interface AsyncHttpClientConfig {
          */
         @WithDefault("true")
         boolean useFutureCompletionThreadPool();
+
+        /**
+         * Defines on which Vert.x context the futures returned by the async client are completed.
+         * <p>
+         * With `vertx-threads`, a call made from a Vert.x thread (e.g. a reactive endpoint, Hibernate Reactive or a Mutiny
+         * pipeline) is completed on the caller's Vert.x context, so the continuation keeps running where the call started.
+         * Calls made from any other thread are not affected.
+         * <p>
+         * With `always`, futures are always completed on a Vert.x context, as Vert.x based clients do. Calls made outside of
+         * a Vert.x context are completed on an event loop.
+         * <p>
+         * With `disabled`, futures are completed as configured by `use-future-completion-thread-pool`.
+         * <p>
+         * This only applies when the Quarkus Vert.x extension is present.
+         */
+        @WithDefault("vertx-threads")
+        VertxContextPropagation vertxContextPropagation();
     }
 
     // TODO: additionalChannelOptions

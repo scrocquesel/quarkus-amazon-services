@@ -2411,6 +2411,35 @@ endif::add-copy-button-to-env-var[]
 |boolean
 |`+++true+++`
 
+a| [[quarkus-amazon-elasticloadbalancing_quarkus-elasticloadbalancing-async-client-advanced-vertx-context-propagation]] [.property-path]##link:#quarkus-amazon-elasticloadbalancing_quarkus-elasticloadbalancing-async-client-advanced-vertx-context-propagation[`+++quarkus.elasticloadbalancing.async-client.advanced.vertx-context-propagation+++`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++quarkus.elasticloadbalancing.async-client.advanced.vertx-context-propagation+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Defines on which Vert.x context the futures returned by the async client are completed.
+
+With `vertx-threads`, a call made from a Vert.x thread (e.g. a reactive endpoint, Hibernate Reactive or a Mutiny pipeline) is completed on the caller's Vert.x context, so the continuation keeps running where the call started. Calls made from any other thread are not affected.
+
+With `always`, futures are always completed on a Vert.x context, as Vert.x based clients do. Calls made outside of a Vert.x context are completed on an event loop.
+
+With `disabled`, futures are completed as configured by `use-future-completion-thread-pool`.
+
+This only applies when the Quarkus Vert.x extension is present.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++QUARKUS_ELASTICLOADBALANCING_ASYNC_CLIENT_ADVANCED_VERTX_CONTEXT_PROPAGATION+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++QUARKUS_ELASTICLOADBALANCING_ASYNC_CLIENT_ADVANCED_VERTX_CONTEXT_PROPAGATION+++`
+endif::add-copy-button-to-env-var[]
+--
+a|`disabled`, `vertx-threads`, `always`
+|`+++vertx-threads+++`
+
 
 |===
 

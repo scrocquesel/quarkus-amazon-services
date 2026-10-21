@@ -7,6 +7,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.Reserve;
 
+import io.quarkiverse.amazon.common.runtime.AsyncClientProxies;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
 
@@ -17,7 +18,7 @@ public class S3TransferManagerProducer {
 
     S3TransferManagerProducer(Instance<S3AsyncClient> asyncClientInstance) {
         this.transferManagerWithAsyncClient = asyncClientInstance.isResolvable() ? S3TransferManager.builder()
-                .s3Client(asyncClientInstance.get()).build() : null;
+                .s3Client(AsyncClientProxies.unwrap(asyncClientInstance.get())).build() : null;
     }
 
     @Reserve

@@ -25,11 +25,14 @@ import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.processor.DotNames;
 import io.quarkus.arc.processor.InjectionPointInfo;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
+import io.quarkus.deployment.Capabilities;
+import io.quarkus.deployment.Capability;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.ExecutorBuildItem;
+import io.quarkus.deployment.builditem.nativeimage.NativeImageProxyDefinitionBuildItem;
 import io.quarkus.runtime.RuntimeValue;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -112,7 +115,9 @@ public class S3CrtProcessor {
     void createS3CrtAsyncClient(List<RequireAmazonClientTransportBuilderBuildItem> amazonClients,
             S3CrtRecorder recorder,
             BuildProducer<SyntheticBeanBuildItem> syntheticBeans,
-            ExecutorBuildItem executorBuildItem) {
+            ExecutorBuildItem executorBuildItem,
+            Capabilities capabilities,
+            BuildProducer<NativeImageProxyDefinitionBuildItem> proxyDefinitions) {
         Optional<RequireAmazonClientTransportBuilderBuildItem> matchingClientBuildItem = amazonClients.stream()
                 .filter(c -> c.getAwsClientName().equals(configName()))
                 .findAny();
@@ -125,6 +130,11 @@ public class S3CrtProcessor {
             RuntimeValue<S3CrtAsyncClientBuilder> asyncClientBuilder = recorder.getCrtAsyncClientBuilder(configName());
 
             asyncClientBuilder = recorder.setExecutor(asyncClientBuilder, executorBuildItem.getExecutorProxy());
+
+            boolean vertxContextPropagation = capabilities.isPresent(Capability.VERTX);
+            if (vertxContextPropagation) {
+                proxyDefinitions.produce(new NativeImageProxyDefinitionBuildItem(S3AsyncClient.class.getName()));
+            }
 
             syntheticBeans.produce(SyntheticBeanBuildItem.configure(S3CrtAsyncClientBuilder.class)
                     .unremovable()
@@ -140,7 +150,7 @@ public class S3CrtProcessor {
                     .setRuntimeInit()
                     .scope(ApplicationScoped.class)
                     .addQualifier(S3Crt.class)
-                    .createWith(recorder.getS3CrtAsyncClient())
+                    .createWith(recorder.getS3CrtAsyncClient(vertxContextPropagation))
                     .destroyer(SdkAutoCloseableDestroyer.class)
                     .addInjectionPoint(ClassType.create(S3CrtAsyncClientBuilder.class))
                     .done());

@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 
+import io.quarkiverse.amazon.common.runtime.AmazonClientCommonRecorder;
 import io.quarkiverse.amazon.common.runtime.AwsConfig;
 import io.quarkiverse.amazon.common.runtime.ClientUtil;
 import io.quarkiverse.amazon.common.runtime.RuntimeConfigurationError;
@@ -74,11 +75,17 @@ public class S3CrtRecorder {
         return new RuntimeValue<>(builder.getValue().futureCompletionExecutor(new S3CrtExecutorWrapper(executor)));
     }
 
-    public Function<SyntheticCreationalContext<S3AsyncClient>, S3AsyncClient> getS3CrtAsyncClient() {
+    public Function<SyntheticCreationalContext<S3AsyncClient>, S3AsyncClient> getS3CrtAsyncClient(
+            boolean vertxContextPropagation) {
         return new Function<SyntheticCreationalContext<S3AsyncClient>, S3AsyncClient>() {
             @Override
             public S3AsyncClient apply(SyntheticCreationalContext<S3AsyncClient> context) {
-                return context.getInjectedReference(S3CrtAsyncClientBuilder.class).build();
+                S3AsyncClient client = context.getInjectedReference(S3CrtAsyncClientBuilder.class).build();
+                if (!vertxContextPropagation) {
+                    return client;
+                }
+                return AmazonClientCommonRecorder.wrapAsyncClient(S3AsyncClient.class, client,
+                        config.getValue().asyncClient().advanced().vertxContextPropagation());
             }
         };
     }

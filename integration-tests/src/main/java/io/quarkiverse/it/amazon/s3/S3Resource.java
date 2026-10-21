@@ -21,6 +21,9 @@ import io.quarkiverse.amazon.common.AmazonClient;
 import io.quarkiverse.amazon.common.runtime.AsyncHttpClientBuildTimeConfig.AsyncClientType;
 import io.quarkiverse.amazon.s3.runtime.S3BuildTimeConfig;
 import io.quarkiverse.amazon.s3.runtime.S3Crt;
+import io.smallrye.mutiny.Uni;
+import io.vertx.core.Context;
+import io.vertx.core.Vertx;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -79,6 +82,26 @@ public class S3Resource {
                 .thenApply(resp -> metadata(resp.response()) + "+" + resp.asUtf8String())
                 .exceptionally(th -> {
                     LOG.error("Error during async S3 operations", th.getCause());
+                    return "ERROR";
+                });
+    }
+
+    @GET
+    @Path("async-context")
+    @Produces(TEXT_PLAIN)
+    public Uni<String> testAsyncS3VertxContext() {
+        LOG.info("Testing Async S3 client Vert.x context propagation with bucket: " + ASYNC_BUCKET);
+        String keyValue = UUID.randomUUID().toString();
+        Context callerContext = Vertx.currentContext();
+
+        return Uni.createFrom().completionStage(() -> S3Utils.createBucketAsync(s3AsyncClient, ASYNC_BUCKET))
+                .chain(bucket -> Uni.createFrom().completionStage(() -> s3AsyncClient.putObject(
+                        S3Utils.createPutRequest(ASYNC_BUCKET, keyValue), AsyncRequestBody.fromString(SAMPLE_S3_OBJECT))))
+                .chain(resp -> Uni.createFrom().completionStage(() -> s3AsyncClient.getObject(
+                        S3Utils.createGetRequest(ASYNC_BUCKET, keyValue), AsyncResponseTransformer.toBytes())))
+                .map(resp -> Vertx.currentContext() == callerContext ? resp.asUtf8String() : "WRONG CONTEXT")
+                .onFailure().recoverWithItem(th -> {
+                    LOG.error("Error during async S3 operations", th);
                     return "ERROR";
                 });
     }

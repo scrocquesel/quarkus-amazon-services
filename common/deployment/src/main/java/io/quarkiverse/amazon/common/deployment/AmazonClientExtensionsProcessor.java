@@ -24,6 +24,7 @@ import io.opentelemetry.instrumentation.awssdk.v2_2.AwsSdkTelemetry;
 import io.quarkiverse.amazon.common.runtime.AmazonClientBuilderRecorder;
 import io.quarkiverse.amazon.common.runtime.AmazonClientCommonRecorder;
 import io.quarkiverse.amazon.common.runtime.AmazonClientOpenTelemetryRecorder;
+import io.quarkiverse.amazon.common.runtime.AsyncHttpClientConfig;
 import io.quarkiverse.amazon.common.runtime.HasAmazonClientRuntimeConfig;
 import io.quarkiverse.amazon.common.runtime.HasSdkBuildTimeConfig;
 import io.quarkiverse.amazon.common.runtime.SdkAutoCloseableDestroyer;
@@ -41,6 +42,7 @@ import io.quarkus.deployment.builditem.ExecutorBuildItem;
 import io.quarkus.deployment.builditem.ExtensionSslNativeSupportBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
+import io.quarkus.deployment.builditem.nativeimage.NativeImageProxyDefinitionBuildItem;
 import io.quarkus.runtime.RuntimeValue;
 import software.amazon.awssdk.awscore.client.builder.AwsAsyncClientBuilder;
 import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
@@ -220,7 +222,10 @@ public class AmazonClientExtensionsProcessor {
             BuildProducer<AmazonClientSyncResultBuildItem> clientSync,
             BuildProducer<AmazonClientAsyncResultBuildItem> clientAsync,
             LaunchModeBuildItem launchModeBuildItem,
-            ExecutorBuildItem executorBuildItem) {
+            ExecutorBuildItem executorBuildItem,
+            Capabilities capabilities,
+            BuildProducer<NativeImageProxyDefinitionBuildItem> proxyDefinitions) {
+        boolean vertxPresent = capabilities.isPresent(Capability.VERTX);
         amazonExtensions.forEach(extension -> createClientBuilders(
                 extension,
                 builderInstances,
@@ -235,7 +240,9 @@ public class AmazonClientExtensionsProcessor {
                 clientSync,
                 clientAsync,
                 launchModeBuildItem,
-                executorBuildItem));
+                executorBuildItem,
+                vertxPresent,
+                proxyDefinitions));
     }
 
     protected void createClientBuilders(
@@ -252,7 +259,9 @@ public class AmazonClientExtensionsProcessor {
             BuildProducer<AmazonClientSyncResultBuildItem> clientSync,
             BuildProducer<AmazonClientAsyncResultBuildItem> clientAsync,
             LaunchModeBuildItem launchModeBuildItem,
-            ExecutorBuildItem executorBuildItem) {
+            ExecutorBuildItem executorBuildItem,
+            boolean vertxPresent,
+            BuildProducer<NativeImageProxyDefinitionBuildItem> proxyDefinitions) {
 
         Function<RuntimeValue<SdkPresigner.Builder>, RuntimeValue<SdkPresigner.Builder>> presignerBuilderSupplier = null;
         if (extension.getPresignerBuilderClass() != null) {
@@ -275,6 +284,7 @@ public class AmazonClientExtensionsProcessor {
                 (syncBuilder, syncTransport) -> builderRecorder.createSyncBuilder(syncBuilder, syncTransport),
                 extension.getAsyncClientName(),
                 extension.getAsyncClientBuilderClass(),
+                vertxPresent ? extension.getAsyncConfig() : null,
                 (asyncBuilder, asyncTransport) -> builderRecorder.createAsyncBuilder(asyncBuilder, asyncTransport,
                         executorBuildItem.getExecutorProxy(), extension.getAsyncConfig()),
                 extension.getPresignerClientName(),
@@ -285,7 +295,8 @@ public class AmazonClientExtensionsProcessor {
                 clientSync,
                 clientAsync,
                 launchModeBuildItem,
-                executorBuildItem);
+                executorBuildItem,
+                proxyDefinitions);
     }
 
     private void createClientBuilders(
@@ -304,6 +315,7 @@ public class AmazonClientExtensionsProcessor {
             BiFunction<RuntimeValue<AwsSyncClientBuilder<?, ?>>, RuntimeValue<SdkHttpClient.Builder>, RuntimeValue<AwsClientBuilder>> syncClientBuilderFunction,
             DotName asyncClientName,
             Class<?> asyncClientBuilderClass,
+            RuntimeValue<AsyncHttpClientConfig> vertxContextPropagationConfig,
             BiFunction<RuntimeValue<AwsAsyncClientBuilder<?, ?>>, RuntimeValue<SdkAsyncHttpClient.Builder>, RuntimeValue<AwsClientBuilder>> asyncClientBuilderFunction,
             DotName presignerClientName,
             Class<?> presignerBuilderClass,
@@ -313,7 +325,8 @@ public class AmazonClientExtensionsProcessor {
             BuildProducer<AmazonClientSyncResultBuildItem> clientSync,
             BuildProducer<AmazonClientAsyncResultBuildItem> clientAsync,
             LaunchModeBuildItem launchModeBuildItem,
-            ExecutorBuildItem executorBuildItem) {
+            ExecutorBuildItem executorBuildItem,
+            BuildProducer<NativeImageProxyDefinitionBuildItem> proxyDefinitions) {
 
         Optional<RuntimeValue<SdkHttpClient.Builder>> syncSdkHttpClientBuilder = amazonClientSyncTransports.stream()
                 .filter(c -> configName.equals(c.getAwsClientName()))
@@ -391,6 +404,10 @@ public class AmazonClientExtensionsProcessor {
             }
         }
         if (asyncSdkAsyncHttpClientBuilder.isPresent() && !asyncClientNames.isEmpty()) {
+            Class<?> asyncClientInterface = vertxContextPropagationConfig != null ? loadClass(asyncClientName) : null;
+            if (asyncClientInterface != null) {
+                proxyDefinitions.produce(new NativeImageProxyDefinitionBuildItem(asyncClientName.toString()));
+            }
             for (String clientName : asyncClientNames) {
                 AmazonClientExtensionBuilderInstanceBuildItem builderInstance = builderInstances.stream()
                         .filter(o -> o.getClientBuilderClass().equals(asyncClientBuilderClass) &&
@@ -415,7 +432,10 @@ public class AmazonClientExtensionsProcessor {
                                 .priority(0)
                                 .setRuntimeInit()
                                 .scope(ApplicationScoped.class)
-                                .createWith(recorder.build(asyncClientBuilderClass, clientName))
+                                .createWith(asyncClientInterface != null
+                                        ? recorder.buildAsync(asyncClientBuilderClass, asyncClientInterface, clientName,
+                                                vertxContextPropagationConfig)
+                                        : recorder.build(asyncClientBuilderClass, clientName))
                                 .addInjectionPoint(ClassType.create(asyncClientBuilderClass),
                                         injectionPointAnnotationsBuilder(clientName))
                                 .destroyer(SdkAutoCloseableDestroyer.class)
@@ -498,6 +518,14 @@ public class AmazonClientExtensionsProcessor {
                             .done());
                 }
             }
+        }
+    }
+
+    private static Class<?> loadClass(DotName className) {
+        try {
+            return Class.forName(className.toString(), false, Thread.currentThread().getContextClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Unable to load async client interface " + className, e);
         }
     }
 }

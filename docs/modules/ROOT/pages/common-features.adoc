@@ -200,6 +200,63 @@ public class DynamodbProducer {
 }
 ----
 
+NOTE: An async client returned by your own producer is not wrapped for xref:#vertx-context-propagation[Vert.x context propagation].
+Wrap it yourself with `VertxContextPropagatingHandler.wrap(DynamoDbAsyncClient.class, builder.build(), VertxContextPropagation.VERTX_THREADS)`.
+
+[[vertx-context-propagation]]
+== Vert.x context propagation
+
+The AWS SDK completes the futures returned by async clients on its own threads: the Quarkus worker pool, or the Netty/CRT event loop
+when `quarkus.<service>.async-client.advanced.use-future-completion-thread-pool` is `false`.
+These threads do not carry the Vert.x context of the caller. Libraries that rely on it, such as Hibernate Reactive, then fail with
+`No current Vertx context found`.
+
+When the Quarkus Vert.x extension is present (e.g. with Quarkus REST or Hibernate Reactive), the extension completes the futures returned by
+async clients on the Vert.x context of the caller. There is nothing to capture or switch manually:
+
+[source,java]
+----
+@Inject
+DynamoDbAsyncClient dynamoDb;
+
+@WithSession
+public Uni<Fruit> importFruit(String name) {
+    return Uni.createFrom().completionStage(() -> dynamoDb.getItem(request(name)))
+            // runs on the caller's Vert.x context, so the Hibernate Reactive session is available
+            .chain(item -> Fruit.persist(toFruit(item)));
+}
+----
+
+The behavior is controlled with `quarkus.<service>.async-client.advanced.vertx-context-propagation`:
+
+[cols="1,3"]
+|===
+|Value |Behavior
+
+|`vertx-threads` (default)
+|A call made from a Vert.x thread (event loop or Vert.x worker) is completed on the caller's Vert.x context.
+Calls made from any other thread (Quarkus worker, virtual thread, `@Blocking` endpoint...) are left untouched and keep completing on the
+SDK threads.
+
+|`always`
+|Futures are always completed on a Vert.x context, as Vert.x based clients (REST Client, reactive SQL clients...) do.
+A call made outside of a Vert.x context is completed on an event loop, so the continuation must not block.
+This mode is experimental: please share your feedback on https://github.com/quarkiverse/quarkus-amazon-services/issues/2145[#2145].
+
+|`disabled`
+|Futures are completed on the SDK threads, as in previous versions.
+|===
+
+Context propagation applies to the futures returned by the client methods, including the S3 CRT client.
+It does not apply to:
+
+* the `Publisher` returned by paginators and the futures returned by `waiter()`,
+* the futures returned by the S3 Transfer Manager,
+* async clients created by your own producer (see above).
+
+WARNING: Never block an event loop thread waiting for an async client future (e.g. with `join()`): the future is completed on that same
+event loop, which leads to a deadlock.
+
 == Custom AWS credentials provider
 
 When configuring credentials type for a given client, you may not find the supported methods fit your context. In such case, you can implement

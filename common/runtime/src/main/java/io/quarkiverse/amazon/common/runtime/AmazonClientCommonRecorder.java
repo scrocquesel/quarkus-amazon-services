@@ -186,6 +186,28 @@ public class AmazonClientCommonRecorder {
         };
     }
 
+    public Function<SyntheticCreationalContext<AwsClient>, AwsClient> buildAsync(Class<?> clazz, Class<?> clientInterface,
+            String clientName, RuntimeValue<AsyncHttpClientConfig> asyncConfig) {
+        Function<SyntheticCreationalContext<AwsClient>, AwsClient> build = build(clazz, clientName);
+        return new Function<SyntheticCreationalContext<AwsClient>, AwsClient>() {
+
+            @Override
+            public AwsClient apply(SyntheticCreationalContext<AwsClient> context) {
+                return wrapAsyncClient(clientInterface, build.apply(context),
+                        asyncConfig.getValue().advanced().vertxContextPropagation());
+            }
+        };
+    }
+
+    /**
+     * Wraps an async client so that its futures are completed on the caller's Vert.x context.
+     * Must only be called when the Vert.x extension is present.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T wrapAsyncClient(Class<?> clientInterface, T client, VertxContextPropagation mode) {
+        return VertxContextPropagatingHandler.wrap((Class<T>) clientInterface, client, mode);
+    }
+
     public Function<SyntheticCreationalContext<SdkPresigner>, SdkPresigner> buildPresigner(Class<?> clazz, String clientName) {
         return new Function<SyntheticCreationalContext<SdkPresigner>, SdkPresigner>() {
 
